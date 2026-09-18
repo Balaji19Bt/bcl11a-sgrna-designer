@@ -1,0 +1,306 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Balaji19Bt/bcl11a-sgrna-designer/blob/main/%60sgRNA_BCL11A.ipynb%60\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "GxWLod_hX1Ry",
+        "outputId": "7f267324-6c70-4463-8efd-3aaec85747ab"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Requirement already satisfied: biopython in /usr/local/lib/python3.12/dist-packages (1.87)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.12/dist-packages (from biopython) (2.0.2)\n"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install biopython"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "MKM1Nq8wYA8V",
+        "outputId": "f4f026e5-58b8-41f8-a3c6-8e73e8bc63e7"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Sequence length: 23855\n",
+            "First 100 bases: GCCCAGCGTATTTACCATTTTCAAATTGATTTAAATAGTAACTTCCATAAGAAGATTAGAATTGCCCTGCTGGCTACTTTCTCTGATAAAAAAAATTTTT\n"
+          ]
+        }
+      ],
+      "source": [
+        "from Bio.Seq import Seq\n",
+        "from Bio import SeqIO, Entrez\n",
+        "\n",
+        "Entrez.email = \"balajisridharan2007@gmail.com\"  # replace with your real email, NCBI requires this\n",
+        "\n",
+        "handle = Entrez.efetch(db=\"nucleotide\", id=\"NG_042065\", rettype=\"fasta\", retmode=\"text\")\n",
+        "record = SeqIO.read(handle, \"fasta\")\n",
+        "sequence = str(record.seq)\n",
+        "\n",
+        "print(\"Sequence length:\", len(sequence))\n",
+        "print(\"First 100 bases:\", sequence[:100])"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "yAsOJv-gYfDL",
+        "outputId": "107afb75-1db1-49d0-c043-299a19593a15"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Found 1421 candidate sgRNAs\n",
+            "Position 50: guide=GAAGATTAGAATTGCCCTGC, PAM=TGG\n",
+            "Position 144: guide=TATTAAAAGCCATGTGAAAA, PAM=AGG\n",
+            "Position 237: guide=CTATGTCCCAGCATCATGCC, PAM=AGG\n",
+            "Position 240: guide=TGTCCCAGCATCATGCCAGG, PAM=TGG\n",
+            "Position 245: guide=CAGCATCATGCCAGGTGGTA, PAM=AGG\n"
+          ]
+        }
+      ],
+      "source": [
+        "def find_sgRNAs(seq, pam=\"GG\"):\n",
+        "    candidates = []\n",
+        "    for i in range(len(seq) - 22):\n",
+        "        window = seq[i:i+23]  # 20bp guide + 3bp PAM\n",
+        "        if window[21:23] == pam:\n",
+        "            guide = window[0:20]\n",
+        "            candidates.append((i, guide, window[20:23]))\n",
+        "    return candidates\n",
+        "\n",
+        "results = find_sgRNAs(sequence)\n",
+        "print(f\"Found {len(results)} candidate sgRNAs\")\n",
+        "for pos, guide, pam in results[:5]:\n",
+        "    print(f\"Position {pos}: guide={guide}, PAM={pam}\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "iu2CMNoXY4u_",
+        "outputId": "8a4dbb7f-5f4e-4795-d6f6-3f519c3a703d"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "741 sgRNAs passed GC filter (out of 1421)\n",
+            "Position 50: guide=GAAGATTAGAATTGCCCTGC, GC%=45.0\n",
+            "Position 237: guide=CTATGTCCCAGCATCATGCC, GC%=55.0\n",
+            "Position 240: guide=TGTCCCAGCATCATGCCAGG, GC%=60.0\n",
+            "Position 245: guide=CAGCATCATGCCAGGTGGTA, GC%=55.0\n",
+            "Position 246: guide=AGCATCATGCCAGGTGGTAA, GC%=50.0\n"
+          ]
+        }
+      ],
+      "source": [
+        "def gc_content(seq):\n",
+        "    return (seq.count(\"G\") + seq.count(\"C\")) / len(seq) * 100\n",
+        "\n",
+        "filtered = [(pos, guide, pam) for pos, guide, pam in results if 40 <= gc_content(guide) <= 60]\n",
+        "print(f\"{len(filtered)} sgRNAs passed GC filter (out of {len(results)})\")\n",
+        "\n",
+        "for pos, guide, pam in filtered[:5]:\n",
+        "    print(f\"Position {pos}: guide={guide}, GC%={gc_content(guide):.1f}\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "engU3zOMZ7Nr",
+        "outputId": "683e905a-5579-4c21-e4a8-005179aeb100"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Position 246: guide=AGCATCATGCCAGGTGGTAA, GC%=50.0\n",
+            "Position 290: guide=TCAAGGAGCTCAGCCTAGTT, GC%=50.0\n",
+            "Position 422: guide=ATCACAGGGGATGTGATGCT, GC%=50.0\n",
+            "Position 423: guide=TCACAGGGGATGTGATGCTT, GC%=50.0\n",
+            "Position 461: guide=TGTTCAGCAGGCAGTGGAAA, GC%=50.0\n",
+            "Position 509: guide=AGCAGCACACGCAAAGATGT, GC%=50.0\n",
+            "Position 515: guide=ACACGCAAAGATGTGGGAGT, GC%=50.0\n",
+            "Position 544: guide=CACAGCACATCCAGATACCT, GC%=50.0\n",
+            "Position 565: guide=GGAGTGGTTCAGTGTAGCTT, GC%=50.0\n",
+            "Position 578: guide=GTAGCTTTGGTGACAGAGTG, GC%=50.0\n"
+          ]
+        }
+      ],
+      "source": [
+        "filtered_sorted = sorted(filtered, key=lambda x: abs(gc_content(x[1]) - 50))\n",
+        "top10 = filtered_sorted[:10]\n",
+        "\n",
+        "for pos, guide, pam in top10:\n",
+        "    print(f\"Position {pos}: guide={guide}, GC%={gc_content(guide):.1f}\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "otLXyZvsaLy5",
+        "outputId": "4e180144-bda7-4e93-a5ad-fbad5e4e7319"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Testing guide: AGCATCATGCCAGGTGGTAA\n",
+            "Number of genomic matches found: 0\n"
+          ]
+        }
+      ],
+      "source": [
+        "from Bio.Blast import NCBIWWW, NCBIXML\n",
+        "\n",
+        "def check_offtarget(guide_seq):\n",
+        "    result_handle = NCBIWWW.qblast(\"blastn\", \"nt\", guide_seq, entrez_query=\"Homo sapiens[Organism]\", megablast=True)\n",
+        "    blast_record = NCBIXML.read(result_handle)\n",
+        "    return len(blast_record.alignments)\n",
+        "\n",
+        "# Test with just ONE guide first to confirm it works\n",
+        "test_guide = top10[0][1]\n",
+        "print(\"Testing guide:\", test_guide)\n",
+        "num_hits = check_offtarget(test_guide)\n",
+        "print(f\"Number of genomic matches found: {num_hits}\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "background_save": true,
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "5Hu8bk04aeFQ",
+        "outputId": "26b00291-5852-488f-b0b8-581aa39febc0"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Testing guide: AGCATCATGCCAGGTGGTAA\n",
+            "Number of genomic matches found: 0\n"
+          ]
+        }
+      ],
+      "source": [
+        "from Bio.Blast import NCBIWWW, NCBIXML\n",
+        "\n",
+        "def check_offtarget(guide_seq):\n",
+        "    result_handle = NCBIWWW.qblast(\"blastn\", \"nt\", guide_seq, entrez_query=\"Homo sapiens[Organism]\", megablast=True)\n",
+        "    blast_record = NCBIXML.read(result_handle)\n",
+        "    return len(blast_record.alignments)\n",
+        "\n",
+        "# Test with just ONE guide first to confirm it works\n",
+        "test_guide = top10[0][1]\n",
+        "print(\"Testing guide:\", test_guide)\n",
+        "num_hits = check_offtarget(test_guide)\n",
+        "print(f\"Number of genomic matches found: {num_hits}\")\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "background_save": true
+        },
+        "id": "INWUAiYNq4uE",
+        "outputId": "1fe9de08-5995-4433-cddc-8b3c7e415d73"
+      },
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Requirement already satisfied: biopython in /usr/local/lib/python3.12/dist-packages (1.87)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.12/dist-packages (from biopython) (2.0.2)\n"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install biopython"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "background_save": true
+        },
+        "id": "fJHe-0amrUjJ"
+      },
+      "outputs": [],
+      "source": []
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyPT31loz6tVyqrvVsNiispm",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
